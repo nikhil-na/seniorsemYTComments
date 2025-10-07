@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from youtube_api import extract_video_id, get_youtube_comments
+from youtube_api import extract_video_id, fetch_and_preprocess_comments
 from dotenv import load_dotenv
 
 load_dotenv() 
@@ -46,14 +46,18 @@ def fetch_comments():
         if not video_id:
             return jsonify({'error': 'Invalid YouTube URL'}), 400
 
-        # Fetch comments only (Step 1)
-        comments = get_youtube_comments(video_id)
+        # Fetch and preprocess comments
+        comments = fetch_and_preprocess_comments(video_id)
 
         return jsonify({
             "video_id": video_id,
             "video_url": video_url,
             "comment_count": len(comments),
-            "comments": comments
+            "comments": comments,
+            "stats": {
+                "total_fetched": len(comments),
+                "total_preprocessed": sum(1 for c in comments if c["cleaned_text"]),
+        }
         })
     except Exception as e:
         return jsonify({"error": f"Failed to retrieve comments: {str(e)}"}), 500

@@ -2,6 +2,7 @@ import googleapiclient.discovery
 import googleapiclient.errors
 import os
 import re
+import emoji
 
 API_KEY = os.getenv("YOUTUBE_API_KEY")
 
@@ -70,4 +71,63 @@ def get_youtube_comments(video_id):
             break
     return comments_list
 
+# Preprocess comments to remove emojis, extra symbols, and clean text for sentiment analysis
+def preprocess_comments(text):
+    """
+    Preprocess comment text by removing emojis, extra symbols, and cleaning text
+    
+    Args:
+        text (str): Raw comment text
+        
+    Returns:
+        str: Cleaned comment text
+    """
+    if not text:
+        return ""
+    
+    # Remove emojis
+    text = emoji.replace_emoji(text, replace='')
+    
+    # Remove URLs
+    text = re.sub(r'http\S+|www\.\S+', '', text)
+    
+    # Remove HTML tags
+    text = re.sub(r'<.*?>', '', text)
+    
+    # Remove extra punctuation and symbols (keep basic punctuation for sentiment)
+    # Keep: . , ! ? - ' "
+    text = re.sub(r'[^\w\s.,!?\-\'\"]', '', text)
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Remove leading/trailing whitespace
+    text = text.strip()
+    
+    # Convert to lowercase for consistency
+    text = text.lower()
 
+    # Filter usernames (e.g., @nikhil -> nikhil)
+    text = re.sub(r'@(\w+)', r'\1', text)
+    
+    return text
+
+# Fetch and preprocess comments for sentiment analysis
+def fetch_and_preprocess_comments(video_id):
+    """Fetch comments and clean them immediately"""
+    comments = get_youtube_comments(video_id)
+
+    if not comments:
+        return []
+
+    processed_comments = []
+    for comment in comments:
+        cleaned_text = preprocess_comments(comment['text'])
+        processed_comments.append({
+            'id': comment.get('id'),
+            'author': preprocess_comments(comment.get('author')),
+            'text': comment.get('text'),
+            'cleaned_text': cleaned_text,
+        })
+
+    return processed_comments
