@@ -3,8 +3,12 @@ import googleapiclient.errors
 import os
 import re
 import emoji
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 API_KEY = os.getenv("YOUTUBE_API_KEY")
+
+# Initialize VADER sentiment analyzer
+vader_analyzer = SentimentIntensityAnalyzer()
 
 # Extract video ID from YouTube URL
 def extract_video_id(url):
@@ -52,12 +56,15 @@ def get_youtube_comments(video_id):
 
             for item in response['items']:
                 comment_data = item['snippet']['topLevelComment']['snippet']
+                cleaned_text = preprocess_comments(comment_data['textDisplay'])
+
                 comments_list.append({
                 'id': item['snippet']['topLevelComment']['id'],
                 'author': comment_data['authorDisplayName'],
                 'text': comment_data['textDisplay'],
                 'likes': comment_data['likeCount'],
-                'published_at': comment_data['publishedAt']
+                'published_at': comment_data['publishedAt'],
+                'sentiment': analyze_sentiment(cleaned_text)
         })
 
             next_page_token = response.get("nextPageToken")
@@ -131,3 +138,66 @@ def fetch_and_preprocess_comments(video_id):
         })
 
     return processed_comments
+
+# Analyze sentiment using VADER
+def analyze_sentiment(text):
+    """
+    Analyze sentiment using VADER
+    VADER is specifically designed for social media text
+    
+    Args:
+        text (str): Cleaned comment text
+        
+    Returns:
+        dict: Sentiment scores and classification
+    """
+    if not text:
+        return {
+            'compound': 0.0,
+            'positive': 0.0,
+            'neutral': 1.0,
+            'negative': 0.0,
+            'sentiment': 'neutral',
+            'confidence': 'low'
+        }
+    try:
+        scores = vader_analyzer.polarity_scores(text)
+        
+        compound = scores['compound']
+        
+        # Classify sentiment based on compound score
+        if compound >= 0.05:
+            sentiment = 'positive'
+        elif compound <= -0.05:
+            sentiment = 'negative'
+        else:
+            sentiment = 'neutral'
+        
+        confidence_score = abs(compound)
+        
+        if confidence_score >= 0.5:
+            confidence = 'high'
+        elif confidence_score >= 0.2:
+            confidence = 'medium'
+        else:
+            confidence = 'low'
+        
+        return {
+            'compound': round(compound, 3),
+            'positive': round(scores['pos'], 3),
+            'neutral': round(scores['neu'], 3),
+            'negative': round(scores['neg'], 3),
+            'sentiment': sentiment,
+            'confidence': confidence
+        }
+        
+    except Exception as e:
+        return {
+            'compound': 0.0,
+            'positive': 0.0,
+            'neutral': 1.0,
+            'negative': 0.0,
+            'sentiment': 'neutral',
+            'confidence': 'low',
+            'error': str(e)
+        }
