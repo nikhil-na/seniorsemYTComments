@@ -7,7 +7,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 
-def cluster_comments(comments, num_clusters=4):
+def cluster_comments(comments, num_clusters=5):
     """
     Cluster comments based on sentiment scores using K-Means
     

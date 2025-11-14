@@ -178,7 +178,7 @@ def cluster_comments_endpoint():
     try:
         data = request.get_json()
         video_url = data.get('video_url')
-        num_clusters = data.get('num_clusters', 4)
+        num_clusters = data.get('num_clusters', 5)
         
         if not video_url:
             return jsonify({'error': 'video_url is required'}), 400
