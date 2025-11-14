@@ -2,8 +2,10 @@ from statistics import mean
 from typing import Counter
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from clustering import cluster_comments
 from youtube_api import extract_video_id, fetch_and_preprocess_comments, analyze_sentiment
 from dotenv import load_dotenv
+from youtube_api import extract_video_id, analyze_sentiment
 
 load_dotenv() 
 
@@ -147,6 +149,87 @@ def sentiment_analysis():
                 'average_compound_score': avg_compound,
                 'overall_sentiment': overall_sentiment,
             },
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Flask endpoint to cluster comments based on sentiment
+@app.route('/api/cluster-comments', methods=['POST'])
+def cluster_comments_endpoint():
+    """
+    ALL-IN-ONE: Fetch → Preprocess → Analyze Sentiment → Cluster
+    Just provide a YouTube URL and everything is done automatically!
+    
+    Request Body:
+        {
+            "video_url": "https://youtube.com/watch?v=...",
+        }
+    
+    Response:
+        {
+            "success": true,
+            "video": {...video info...},
+            "comments": [...comments with clusters...],
+            "clusters": {...cluster analysis...},
+            "sentiment_statistics": {...},
+            "cluster_statistics": {...}
+        }
+    """
+    try:
+        data = request.get_json()
+        video_url = data.get('video_url')
+        num_clusters = data.get('num_clusters', 3)
+        
+        if not video_url:
+            return jsonify({'error': 'video_url is required'}), 400
+        
+        # Extract video ID
+        video_id = extract_video_id(video_url)
+        if not video_id:
+            return jsonify({'error': 'Invalid YouTube URL'}), 400
+    
+        # Fetch and preprocess comments
+        comments = fetch_and_preprocess_comments(video_id)
+        
+        if not comments:
+            return jsonify({'error': 'No comments found for this video'}), 404
+
+        # Analyze sentiment for each comment and populate statistics
+        # The following variables are declared here to be populated in this step.
+        # Note: The declarations below this block in the original file will become redundant.
+        analyzed_comments = [] 
+        sentiment_counts = Counter()
+        confidence_counts = Counter()
+        compound_scores = []
+        
+        for comment in comments:
+            cleaned_text = comment.get('cleaned_text', '')
+            sentiment_result = analyze_sentiment(cleaned_text)
+            
+            # Add sentiment to the comment dictionary (modifies 'comments' list in place)
+            comment['sentiment'] = sentiment_result
+            
+            # Populate the sentiment statistics
+            sentiment_counts[sentiment_result['sentiment']] += 1
+            confidence_counts[sentiment_result['confidence']] += 1
+            compound_scores.append(sentiment_result['compound'])
+            
+            # Add the sentiment-augmented comment to the analyzed_comments list
+            analyzed_comments.append(comment)
+        
+        # Cluster comments
+        clustered_comments, clusters_info, statistics = cluster_comments(
+            comments, 
+            num_clusters
+        )
+        
+        # Return complete results
+        return jsonify({
+            'success': True,
+            'video': video_id,
+            'comments': clustered_comments,
+            'clusters': clusters_info,
+            'statistics': statistics
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
