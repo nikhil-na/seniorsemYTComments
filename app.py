@@ -1,20 +1,16 @@
 from statistics import mean
-from typing import Counter
-from flask import Flask, request, jsonify
+from collections import Counter
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from clustering import cluster_comments
 from youtube_api import extract_video_id, fetch_and_preprocess_comments, analyze_sentiment
 from dotenv import load_dotenv
-from youtube_api import extract_video_id, analyze_sentiment
+import os
 
 load_dotenv() 
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
-
-@app.route("/")
-def home():
-    return "Hello, Flask!"
 
 # Flask endpoint to download all comments from a given YouTube video URL.
 @app.route("/api/fetch_comments", methods=["POST"])
@@ -234,6 +230,22 @@ def cluster_comments_endpoint():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# Serve static files - must be after API routes
+@app.route("/")
+def home():
+    """Serve the main HTML page"""
+    return send_file('index.html')
+
+@app.route("/styles.css")
+def serve_css():
+    """Serve CSS file"""
+    return send_file('styles.css', mimetype='text/css')
+
+@app.route("/script.js")
+def serve_js():
+    """Serve JavaScript file"""
+    return send_file('script.js', mimetype='application/javascript')
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
